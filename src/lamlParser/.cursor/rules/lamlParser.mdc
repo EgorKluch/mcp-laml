@@ -1,0 +1,81 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+$meta:
+  name: 'lamlParserModule'
+  goal: 'defineLamlParserModuleResponsibility'
+  domain: 'module.lamlParser.specification'
+  apply: 'lamlParserModule'
+  version: 1.0
+  purpose: "Define lamlParser module responsibility, API, and operational behavior"
+  domains: ['module.lamlParser.specification', 'parsing.laml.operations', 'architecture.module.definition']
+
+moduleResponsibility:
+  purpose: "Transform YAML text into typed LAML documents with validation"
+  
+  corePurpose: "Parse YAML input and classify values according to LAML type system"
+  scope: "YAML parsing with LAML type detection and document validation"
+  boundaries: "Does not handle file I/O, document modification, or complex reference resolution"
+
+publicAPI:
+  purpose: "External interface exposed by the module"
+  
+  LamlParser:
+    responsibility: "Main parsing class with configurable error handling"
+    method: "parse(yamlText: string): LamlParseResult"
+    behavior: "Returns success with typed document or failure with errors"
+    
+  parseLaml:
+    responsibility: "Convenience function for direct parsing"
+    signature: "parseLaml(input: string, options?: any, errorHandler?: ErrorHandler): LamlParseResult"
+    behavior: "Creates parser instance and returns parse result"
+    
+  resolveReferences:
+    responsibility: "Reference resolution placeholder"
+    current: "Returns document unchanged - future implementation"
+    
+  types:
+    LamlValueType: "Enumeration of LAML value classifications"
+    LamlValue: "Typed value structure with metadata"
+    LamlDocument: "Complete document with required $meta section"
+    LamlParseResult: "Success/failure discriminated union"
+
+operationalBehavior:
+  purpose: "How the module processes input and produces output"
+  
+  inputProcessing:
+    accepts: "Raw YAML text or markdown-wrapped YAML"
+    preprocessing: "Extracts YAML from markdown code blocks when present"
+    validation: "Requires valid YAML syntax for processing"
+    
+  typeClassification:
+    quoted: "Single quotes → literal values, double quotes → descriptive text"
+    unquoted: "Boolean/number detection, camelCase → literal, spaces → descriptive"
+    references: "Values starting with * preserved as reference type"
+    
+  documentValidation:
+    required: "$meta section with name and purpose fields"
+    behavior: "Returns failure if required structure missing"
+    errorReporting: "Detailed validation messages through ErrorHandler"
+    
+  resultGeneration:
+    success: "Returns LamlDocument with typed values and warnings"
+    failure: "Returns null document with error list and warnings"
+
+moduleDependencies:
+  purpose: "External and internal dependencies"
+  
+  internal: "../errorHandler (error management and reporting)"
+  external: "yaml-ast-parser (YAML parsing with quote preservation)"
+  principle: "Minimal dependencies for focused functionality"
+
+moduleCharacteristics:
+  purpose: "Properties that make this a well-defined local module"
+  
+  selfContained: "Complete implementation with types, tests, and API"
+  singleResponsibility: "LAML parsing and type detection only"
+  clearInterface: "Well-defined input/output through public API"
+  minimalCoupling: "Single internal dependency on errorHandler"
+  testable: "Comprehensive test suite within module directory"
