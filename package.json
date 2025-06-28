@@ -17,6 +17,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.4.0",
     "chevrotain": "^11.0.3",
+    "flowmcp": "^2.1.4",
     "yaml-ast-parser": "^0.0.43"
   },
   "devDependencies": {

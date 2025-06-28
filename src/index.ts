@@ -1,13 +1,5 @@
 import { LamlMcpServer } from './server/index.js';
 
-// Exports for use as a library
-export { ErrorHandler, McpCriticalError } from './errorHandler/index.js';
-export type { ErrorType, WarningType, McpError, McpWarning } from './errorHandler/index.js';
-export { LamlMcpServer } from './server/index.js';
-export type { McpResponse } from './server/index.js';
-export { parseLaml, resolveReferences } from './lamlParser/index.js';
-export type { LamlDocument, LamlParseResult } from './lamlParser/index.js';
-
 async function main() {
   try {
     const server = new LamlMcpServer();
@@ -29,8 +21,10 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// Start the server
-main().catch((error) => {
-  console.error('Unhandled error:', error);
-  process.exit(1);
-}); 
+// Аналог require.main === module для ESM - запускаем только при прямом выполнении
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error) => {
+    console.error('Unhandled error:', error);
+    process.exit(1);
+  });
+} 
