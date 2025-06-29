@@ -1,37 +1,54 @@
 import {CallToolRequest} from '@modelcontextprotocol/sdk/types.js';
 import {McpSession} from 'flowmcp';
 import {jest, describe, it, expect, beforeEach, beforeAll, afterAll} from '@jest/globals';
-import {handleLoadLaml} from '../loadLamlHandler.js';
+import {handleLoadLaml, LoadLamlResult} from '../loadLamlHandler.js';
 import {writeFile, mkdir, chmod, rmdir, unlink, symlink} from 'fs/promises';
 import {tmpdir} from 'os';
 import {join} from 'path';
 
-// Mock McpSession
-const mockAddError = jest.fn();
-const mockSessionGetResult = jest.fn((result) => ({content: result}));
-const mockThrowError = jest.fn();
-
-const mockSession = {
-  logger: {
-    addError: mockAddError
-  },
-  getResult: mockSessionGetResult,
-  throwError: mockThrowError
-} as unknown as McpSession;
+// Mock session for testing (following pattern from validateLaml.test.ts)
+function createMockSession() {
+  const errors: unknown[] = [];
+  const warnings: unknown[] = [];
+  
+  return {
+    logger: {
+      addError: (error: any) => errors.push(error),
+      addWarning: (warning: any) => warnings.push(warning)
+    },
+    throwError: (error: any) => { throw new Error(error.message); },
+    getResult: (result: any) => ({ content: result }),
+    _errors: errors,
+    _warnings: warnings
+  } as any;
+}
 
 describe('handleLoadLaml', () => {
   let testDir: string;
   let testFile: string;
   let restrictedFile: string;
 
+  // Valid LAML content for testing
+  const validLamlContent = `\`\`\`yaml
+$meta:
+  name: 'testDocument'
+  purpose: 'Test LAML document'
+  version: 1.0
+  domains: ['test.domain']
+
+testSection:
+  purpose: "Test section for validation"
+  testProperty: "test value"
+\`\`\``;
+
   beforeAll(async () => {
     // Create temp directory for tests
     testDir = join(tmpdir(), 'laml-handler-test-' + Date.now());
     await mkdir(testDir, { recursive: true });
     
-    // Create test file
+    // Create test file with valid LAML content
     testFile = join(testDir, 'test.laml');
-    await writeFile(testFile, 'test LAML content', 'utf-8');
+    await writeFile(testFile, validLamlContent, 'utf-8');
     
     // Create restricted file (if possible on this system)
     restrictedFile = join(testDir, 'restricted.laml');
@@ -55,11 +72,8 @@ describe('handleLoadLaml', () => {
     }
   });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('should successfully load LAML file with absolute path', async () => {
+    const mockSession = createMockSession();
     const request: CallToolRequest = {
       method: 'tools/call',
       params: {
@@ -73,11 +87,25 @@ describe('handleLoadLaml', () => {
 
     const result = await handleLoadLaml(mockSession, request);
 
-    expect(mockSessionGetResult).toHaveBeenCalledWith({content: 'test LAML content'});
-    expect(result).toEqual({content: {content: 'test LAML content'}});
+    // Verify the result structure and types
+    expect(result.content).toHaveProperty('content');
+    expect(result.content).toHaveProperty('autoFixedIssues');
+    expect(result.content).toHaveProperty('isValid');
+    
+    const actualResult = result.content as LoadLamlResult;
+    
+    // Verify content types
+    expect(typeof actualResult.content).toBe('string');
+    expect(Array.isArray(actualResult.autoFixedIssues)).toBe(true);
+    expect(typeof actualResult.isValid).toBe('boolean');
+    
+    // Verify the result contains the expected YAML content
+    expect(actualResult.content).toContain('$meta:');
+    expect(actualResult.content).toContain('testSection:');
   });
 
   it('should handle relative path by adding error', async () => {
+    const mockSession = createMockSession();
     const request: CallToolRequest = {
       method: 'tools/call',
       params: {
@@ -91,16 +119,17 @@ describe('handleLoadLaml', () => {
 
     const result = await handleLoadLaml(mockSession, request);
 
-    expect(mockAddError).toHaveBeenCalledWith({
+    expect((mockSession as any)._errors).toHaveLength(1);
+    expect((mockSession as any)._errors[0]).toEqual({
       code: 'LAML_INVALID_PATH_FORMAT',
       message: 'LAML file path must be absolute',
       context: {path: 'relative/path/to/file.laml'}
     });
-    expect(mockSessionGetResult).toHaveBeenCalledWith({});
     expect(result).toEqual({content: {}});
   });
 
   it('should handle Windows-style relative path', async () => {
+    const mockSession = createMockSession();
     const request: CallToolRequest = {
       method: 'tools/call',
       params: {
@@ -114,16 +143,17 @@ describe('handleLoadLaml', () => {
 
     const result = await handleLoadLaml(mockSession, request);
 
-    expect(mockAddError).toHaveBeenCalledWith({
+    expect((mockSession as any)._errors).toHaveLength(1);
+    expect((mockSession as any)._errors[0]).toEqual({
       code: 'LAML_INVALID_PATH_FORMAT',
       message: 'LAML file path must be absolute',
       context: {path: '.\\relative\\path\\to\\file.laml'}
     });
-    expect(mockSessionGetResult).toHaveBeenCalledWith({});
     expect(result).toEqual({content: {}});
   });
 
   it('should handle empty path', async () => {
+    const mockSession = createMockSession();
     const request: CallToolRequest = {
       method: 'tools/call',
       params: {
@@ -137,16 +167,17 @@ describe('handleLoadLaml', () => {
 
     const result = await handleLoadLaml(mockSession, request);
 
-    expect(mockAddError).toHaveBeenCalledWith({
+    expect((mockSession as any)._errors).toHaveLength(1);
+    expect((mockSession as any)._errors[0]).toEqual({
       code: 'LAML_INVALID_PATH_FORMAT',
       message: 'LAML file path must be absolute',
       context: {path: ''}
     });
-    expect(mockSessionGetResult).toHaveBeenCalledWith({});
     expect(result).toEqual({content: {}});
   });
 
   it('should handle file not found error', async () => {
+    const mockSession = createMockSession();
     const nonExistentFile = join(testDir, 'nonexistent.laml');
     
     const request: CallToolRequest = {
@@ -162,15 +193,16 @@ describe('handleLoadLaml', () => {
 
     const result = await handleLoadLaml(mockSession, request);
 
-    expect(mockAddError).toHaveBeenCalledWith({
+    expect((mockSession as any)._errors).toHaveLength(1);
+    expect((mockSession as any)._errors[0]).toEqual({
       code: 'LAML_FILE_NOT_FOUND',
       context: {path: nonExistentFile}
     });
-    expect(mockSessionGetResult).toHaveBeenCalledWith({});
     expect(result).toEqual({content: {}});
   });
 
   it('should handle directory instead of file error', async () => {
+    const mockSession = createMockSession();
     const request: CallToolRequest = {
       method: 'tools/call',
       params: {
@@ -184,11 +216,11 @@ describe('handleLoadLaml', () => {
 
     const result = await handleLoadLaml(mockSession, request);
 
-    expect(mockAddError).toHaveBeenCalledWith({
+    expect((mockSession as any)._errors).toHaveLength(1);
+    expect((mockSession as any)._errors[0]).toEqual({
       code: 'LAML_PATH_IS_DIRECTORY',
       context: {path: testDir}
     });
-    expect(mockSessionGetResult).toHaveBeenCalledWith({});
     expect(result).toEqual({content: {}});
   });
 
@@ -200,6 +232,7 @@ describe('handleLoadLaml', () => {
       return; // Skip test if chmod is not supported
     }
 
+    const mockSession = createMockSession();
     const request: CallToolRequest = {
       method: 'tools/call',
       params: {
@@ -215,15 +248,15 @@ describe('handleLoadLaml', () => {
 
     // Check if we got either permission denied or file not found
     // (behavior can vary by system)
-    const calls = mockAddError.mock.calls;
-    expect(calls.length).toBe(1);
-    const errorCall = calls[0][0] as { code: string };
+    const errors = (mockSession as any)._errors;
+    expect(errors.length).toBe(1);
+    const errorCall = errors[0] as { code: string };
     expect(['LAML_PERMISSION_DENIED', 'LAML_FILE_NOT_FOUND']).toContain(errorCall.code);
-    expect(mockSessionGetResult).toHaveBeenCalledWith({});
     expect(result).toEqual({content: {}});
   });
 
   it('should handle critical errors by throwing', async () => {
+    const mockSession = createMockSession();
     // Create a circular symbolic link to trigger ELOOP or similar critical error
     const circularLink = join(testDir, 'circular.laml');
     
@@ -244,19 +277,20 @@ describe('handleLoadLaml', () => {
         }
       };
 
-          const result = await handleLoadLaml(mockSession, request);
+      const result = await handleLoadLaml(mockSession, request);
 
-    expect(mockAddError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        code: 'LAML_READ_CRITICAL_ERROR',
-        context: expect.objectContaining({
-          path: longPath,
-          originalError: expect.any(String)
+      const errors = (mockSession as any)._errors;
+      expect(errors.length).toBe(1);
+      expect(errors[0]).toEqual(
+        expect.objectContaining({
+          code: 'LAML_READ_CRITICAL_ERROR',
+          context: expect.objectContaining({
+            path: longPath,
+            originalError: expect.any(String)
+          })
         })
-      })
-    );
-    expect(mockSessionGetResult).toHaveBeenCalledWith({});
-    expect(result).toEqual({content: {}});
+      );
+      expect(result).toEqual({content: {}});
       return;
     }
 
@@ -273,7 +307,9 @@ describe('handleLoadLaml', () => {
 
     const result = await handleLoadLaml(mockSession, request);
 
-    expect(mockAddError).toHaveBeenCalledWith(
+    const errors = (mockSession as any)._errors;
+    expect(errors.length).toBe(1);
+    expect(errors[0]).toEqual(
       expect.objectContaining({
         code: 'LAML_READ_CRITICAL_ERROR',
         context: expect.objectContaining({
@@ -282,7 +318,6 @@ describe('handleLoadLaml', () => {
         })
       })
     );
-    expect(mockSessionGetResult).toHaveBeenCalledWith({});
     expect(result).toEqual({content: {}});
 
     // Cleanup circular link

@@ -1,11 +1,20 @@
 import {CallToolRequest, CallToolResult} from '@modelcontextprotocol/sdk/types.js';
 import {McpSession} from 'flowmcp';
-import {readFile} from 'fs/promises';
+import {readFile, writeFile} from 'fs/promises';
 import {isAbsolute, resolve} from 'path';
+import { parseLaml } from '../../lamlParser/lamlParser.js';
+import { validateLaml } from '../../lamlParser/lamlValidator.js';
+import { extractYamlFromMarkdown } from '../../lamlParser/validators/utils/markdownUtils.js';
 
 export interface LoadLamlArgs {
   project: string;
   path: string;
+}
+
+export interface LoadLamlResult {
+  content?: string;
+  autoFixedIssues?: string[];
+  isValid?: boolean;
 }
 
 export async function handleLoadLaml(
@@ -30,9 +39,30 @@ export async function handleLoadLaml(
     const fullPath = resolve(path);
 
     // Read the LAML file
-    const content = await readFile(fullPath, 'utf-8');
+    const originalContent = await readFile(fullPath, 'utf-8');
 
-    return session.getResult({content});
+    // Parse LAML content
+    const parseResult = parseLaml(originalContent, fullPath);
+    
+    // Validate and auto-fix LAML
+    const validationResult = validateLaml(parseResult, session, originalContent, fullPath);
+    
+    // Write fixed content back to file if there were auto-fixes
+    if (validationResult.fixedContent && validationResult.autoFixedIssues.length > 0) {
+      await writeFile(fullPath, validationResult.fixedContent, 'utf-8');
+    }
+    
+    // Extract YAML content from the fixed or original content
+    const contentToExtract = validationResult.fixedContent || originalContent;
+    const yamlExtractionResult = extractYamlFromMarkdown(contentToExtract, fullPath);
+    
+    const result: LoadLamlResult = {
+      content: yamlExtractionResult.yamlContent,
+      autoFixedIssues: validationResult.autoFixedIssues,
+      isValid: validationResult.isValid
+    };
+
+    return session.getResult(result);
   } catch (error) {
     let errorMessage: string;
     /* istanbul ignore if */

@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ```yaml
 $meta:
@@ -20,7 +20,7 @@ syntax:
       prefix: '*'
       notation: 'dotNotation'
       validation: 'mustExist'
-      example: '*$meta.name'
+      example: "*$meta.name"
 
     literal:
       definition: "Value of pseudo-enumeration"
