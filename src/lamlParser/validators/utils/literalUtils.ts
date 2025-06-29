@@ -1,17 +1,48 @@
 /**
- * Checks if value is a proper literal format (camelCase)
+ * Checks if value is a proper literal format (camelCase, domain paths, or file paths)
  */
 export function isProperLiteralFormat(value: string): boolean {
-  // Check if value is in camelCase and contains only alphanumeric characters
-  return /^[a-z][a-zA-Z0-9]*$/.test(value);
+  // Standard camelCase literal
+  if (/^[a-z][a-zA-Z0-9]*$/.test(value)) {
+    return true;
+  }
+  
+  // Domain path format (dot notation): level1.level2.level3.level4
+  if (/^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*){1,3}$/.test(value)) {
+    return true;
+  }
+  
+  // File path format: paths with slashes and extensions
+  if (value.includes('/') || value.includes('\\') || /\.[a-zA-Z0-9]+$/.test(value)) {
+    // Basic validation for file paths - should not contain invalid characters
+    return !/[<>:"|?*]/.test(value);
+  }
+  
+  // Other valid literal formats can be added here
+  return false;
 }
 
 /**
  * Checks if value is a literal value (short, single concept)
  */
 export function isLiteralValue(value: string): boolean {
-  // Literal values are typically short, single concepts
-  return value.length <= 50 && !value.includes(' ') && !value.includes('\n');
+  // Basic length and whitespace checks - literal values are short and don't contain natural language
+  if (value.length > 50 || value.includes(' ') || value.includes('\n')) {
+    return false;
+  }
+  
+  // Exclude URLs and protocols
+  if (value.includes('://') || value.includes('@')) {
+    return false;
+  }
+  
+  // Exclude syntax examples and reference patterns (starting with *)
+  if (value.startsWith('*') || value.startsWith('\\*')) {
+    return false;
+  }
+  
+  // Literal values should be short, single concepts (camelCase, domain paths, file paths, etc.)
+  return true;
 }
 
 /**

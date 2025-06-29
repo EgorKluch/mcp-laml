@@ -2,6 +2,7 @@ import * as yaml from 'yaml';
 import { LamlParseResult, parseLaml } from '../../lamlParser.js';
 import { LamlValidationResult, ValidationContext } from '../types.js';
 import { McpSession } from 'flowmcp';
+import { AutoFixManager } from '../utils/autoFixManager.js';
 import { validateMandatorySections } from './validateMandatorySections.js';
 import { validateYamlMergeKeys } from '../references/validateYamlMergeKeys.js';
 import { validateReferences } from '../references/validateReferences.js';
@@ -30,7 +31,7 @@ export function validateLaml(
     yamlWrappingContext = {
       document: new yaml.Document(), // Temporary document
       session,
-      autoFixedIssues: [],
+      autoFixManager: new AutoFixManager(),
       originalContent,
       filename
     };
@@ -59,7 +60,7 @@ export function validateLaml(
     });
     return {
       isValid: false,
-      autoFixedIssues: yamlWrappingContext?.autoFixedIssues || [],
+      autoFixedIssues: yamlWrappingContext?.autoFixManager.getAll() || [],
       fixedContent
     };
   }
@@ -67,7 +68,7 @@ export function validateLaml(
   const context: ValidationContext = {
     document: parseResult.ast,
     session,
-    autoFixedIssues: yamlWrappingContext?.autoFixedIssues || [],
+    autoFixManager: yamlWrappingContext?.autoFixManager || new AutoFixManager(),
     originalContent,
     filename
   };
@@ -136,7 +137,7 @@ export function validateLaml(
   let finalFixedContent = fixedContent;
   
   // Generate fixed source if there are auto-fixes, regardless of validity
-  if (context.autoFixedIssues.length > 0) {
+  if (context.autoFixManager.count() > 0) {
     try {
       fixedSource = context.document.toString();
       
@@ -160,9 +161,9 @@ export function validateLaml(
 
   return {
     isValid,
-    fixedDocument: context.autoFixedIssues.length > 0 ? context.document : undefined,
+    fixedDocument: context.autoFixManager.count() > 0 ? context.document : undefined,
     fixedSource,
     fixedContent: finalFixedContent,
-    autoFixedIssues: context.autoFixedIssues
+    autoFixedIssues: context.autoFixManager.getAll()
   };
 } 

@@ -1,6 +1,7 @@
 import * as yaml from 'yaml';
 import { validateDomainsField } from '../validateDomainsField.js';
 import { ValidationContext } from '../../types.js';
+import { AutoFixManager } from '../../utils/autoFixManager.js';
 
 // Mock session for testing
 function createMockSession() {
@@ -22,11 +23,12 @@ function createMockSession() {
 function createValidationContext(yamlContent: string): ValidationContext {
   const document = yaml.parseDocument(yamlContent);
   const session = createMockSession();
+  const autoFixManager = new AutoFixManager();
   
   return {
     document,
     session,
-    autoFixedIssues: [],
+    autoFixManager,
   };
 }
 
@@ -144,8 +146,8 @@ describe('validateDomainsField', () => {
     expect(errors.some((e: any) => e.message.includes('duplicate'))).toBe(false);
     
     // Should have auto-fix message
-    expect(context.autoFixedIssues.length).toBeGreaterThan(0);
-    expect(context.autoFixedIssues.some(msg => msg.includes('Removed duplicate domains'))).toBe(true);
+    expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
+    expect(context.autoFixManager.getAll().some(msg => msg.includes('Removed duplicate domains'))).toBe(true);
     
     // YAML sequence should be updated to remove duplicates
     expect(domainsSeq.items.length).toBe(2); // Only unique domains remain

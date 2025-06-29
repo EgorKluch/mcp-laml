@@ -12,6 +12,7 @@ export interface LoadLamlArgs {
 }
 
 export interface LoadLamlResult {
+  prompt?: string,
   content?: string;
   autoFixedIssues?: string[];
   isValid?: boolean;
@@ -57,9 +58,10 @@ export async function handleLoadLaml(
     const yamlExtractionResult = extractYamlFromMarkdown(contentToExtract, fullPath);
     
     const result: LoadLamlResult = {
-      content: yamlExtractionResult.yamlContent,
+      prompt: 'Provide a brief summary of errors and auto-fixes if any',
+      isValid: validationResult.isValid,
       autoFixedIssues: validationResult.autoFixedIssues,
-      isValid: validationResult.isValid
+      content: yamlExtractionResult.yamlContent,
     };
 
     return session.getResult(result);

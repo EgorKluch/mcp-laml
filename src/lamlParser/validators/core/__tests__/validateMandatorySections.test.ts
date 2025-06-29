@@ -1,6 +1,7 @@
 import * as yaml from 'yaml';
 import { validateMandatorySections } from '../validateMandatorySections.js';
 import { ValidationContext } from '../../types.js';
+import { AutoFixManager } from '../../utils/autoFixManager.js';
 
 // Mock session for testing
 function createMockSession() {
@@ -22,11 +23,12 @@ function createMockSession() {
 function createValidationContext(yamlContent: string): ValidationContext {
   const document = yaml.parseDocument(yamlContent);
   const session = createMockSession();
+  const autoFixManager = new AutoFixManager();
   
   return {
     document,
     session,
-    autoFixedIssues: [],
+    autoFixManager,
   };
 }
 
@@ -57,7 +59,7 @@ section1:
 
     validateMandatorySections(context);
 
-    expect(context.autoFixedIssues).toContain('Added missing $meta section');
+    expect(context.autoFixManager.getAll()).toContain('Added missing $meta section');
     
     // Check that $meta was actually added to the document
     const rootMap = context.document.contents as yaml.YAMLMap;
@@ -79,7 +81,7 @@ $meta:
 
     validateMandatorySections(context);
 
-    expect(context.autoFixedIssues).toContain('Moved $meta section to first position');
+    expect(context.autoFixManager.getAll()).toContain('Moved $meta section to first position');
     
     // Check that $meta is now first
     const rootMap = context.document.contents as yaml.YAMLMap;

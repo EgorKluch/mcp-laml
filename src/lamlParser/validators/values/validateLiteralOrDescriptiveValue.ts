@@ -40,7 +40,7 @@ export function validateLiteralOrDescriptiveValue(
     if (yaml.isScalar(pair.value) && pair.value.type !== yaml.Scalar.QUOTE_SINGLE) {
       const oldQuoteType = pair.value.type;
       pair.value.type = yaml.Scalar.QUOTE_SINGLE;
-      context.autoFixedIssues.push(`Fixed literal quote style for "${value}": ${oldQuoteType} -> single quotes`);
+      context.autoFixManager.add(`Fixed literal quote style for "${value}": ${oldQuoteType} -> single quotes`);
     }
   } else {
     // Descriptive value
@@ -59,7 +59,7 @@ export function validateLiteralOrDescriptiveValue(
     if (yaml.isScalar(pair.value) && pair.value.type !== yaml.Scalar.QUOTE_DOUBLE) {
       const oldQuoteType = pair.value.type;
       pair.value.type = yaml.Scalar.QUOTE_DOUBLE;
-      context.autoFixedIssues.push(`Fixed descriptive quote style for "${value}": ${oldQuoteType} -> double quotes`);
+      context.autoFixManager.add(`Fixed descriptive quote style for "${value}": ${oldQuoteType} -> double quotes`);
     }
   }
 } 

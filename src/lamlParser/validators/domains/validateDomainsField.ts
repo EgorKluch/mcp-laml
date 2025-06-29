@@ -94,7 +94,7 @@ export function validateDomainsField(context: ValidationContext, metaMap: yaml.Y
     domains.splice(0, domains.length, ...Array.from(uniqueDomains));
     
     // Track the auto-fix
-    context.autoFixedIssues.push(`Removed duplicate domains: ${duplicates.join(', ')}`);
+    context.autoFixManager.add(`Removed duplicate domains: ${duplicates.join(', ')}`);
   }
 
   // Validate maximum 3 domains

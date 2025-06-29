@@ -1,6 +1,7 @@
 import * as yaml from 'yaml';
 import { validateMetaSection } from '../validateMetaSection.js';
 import { ValidationContext } from '../../types.js';
+import { AutoFixManager } from '../../utils/autoFixManager.js';
 
 // Mock session for testing
 function createMockSession() {
@@ -22,11 +23,12 @@ function createMockSession() {
 function createValidationContext(yamlContent: string): ValidationContext {
   const document = yaml.parseDocument(yamlContent);
   const session = createMockSession();
+  const autoFixManager = new AutoFixManager();
   
   return {
     document,
     session,
-    autoFixedIssues: [],
+    autoFixManager,
   };
 }
 
@@ -67,10 +69,10 @@ $meta:
     const metaItem = getMetaItem(context)!;
     validateMetaSection(context, metaItem);
 
-    expect(context.autoFixedIssues.length).toBeGreaterThan(0);
+    expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
     
     // Should have added missing purpose, version, spec, and domains
-    const autoFixMessages = context.autoFixedIssues.join(' ');
+    const autoFixMessages = context.autoFixManager.getAll().join(' ');
     expect(autoFixMessages).toContain('purpose');
     expect(autoFixMessages).toContain('version');
     expect(autoFixMessages).toContain('spec');
@@ -157,7 +159,7 @@ $meta: {}
     const metaItemBefore = getMetaItem(context)!;
     validateMetaSection(context, metaItemBefore);
 
-    expect(context.autoFixedIssues.length).toBeGreaterThan(0);
+    expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
     
     // Check that all required fields were added with non-empty values
     const rootMap = context.document.contents as yaml.YAMLMap;

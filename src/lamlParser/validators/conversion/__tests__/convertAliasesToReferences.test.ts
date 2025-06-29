@@ -1,6 +1,7 @@
 import { convertAliasesToReferences } from '../convertAliasesToReferences.js';
 import { ValidationContext } from '../../types.js';
 import { parseLaml } from '../../../lamlParser.js';
+import { AutoFixManager } from '../../utils/autoFixManager.js';
 
 // Mock session for testing
 function createMockSession() {
@@ -23,11 +24,12 @@ function createMockSession() {
 function createValidationContext(yamlContent: string): ValidationContext {
   const session = createMockSession();
   const parseResult = parseLaml(yamlContent);
+  const autoFixManager = new AutoFixManager();
   
   return {
     document: parseResult.ast!,
     session,
-    autoFixedIssues: []
+    autoFixManager,
   };
 }
 
@@ -57,7 +59,7 @@ section2:
     expect((context.session as any)._errors).toHaveLength(0);
   });
 
-  test('should detect and report YAML aliases', () => {
+  test('should convert YAML aliases to LAML references', () => {
     const content = `
 $meta:
   name: 'testWithAliases'
@@ -78,16 +80,18 @@ section1:
     const context = createValidationContext(content);
     convertAliasesToReferences(context);
 
-    // Should add error for YAML alias
+    // Should not add any errors since aliases are converted
     const errors = (context.session as any)._errors;
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].code).toBe('LAML_YAML_ALIAS_NOT_ALLOWED');
-    expect(errors[0].message).toContain('YAML aliases are not allowed');
-    expect(errors[0].context.alias).toBe('base');
-    expect(errors[0].context.solution).toContain('LAML reference format');
+    expect(errors.length).toBe(0);
+    
+    // Should add auto-fix message
+    const autoFixMessages = context.autoFixManager.getAll();
+    expect(autoFixMessages.length).toBeGreaterThan(0);
+    expect(autoFixMessages[0]).toContain('Converted YAML alias to LAML reference');
+    expect(autoFixMessages[0]).toContain('base');
   });
 
-  test('should handle multiple aliases', () => {
+  test('should convert multiple aliases', () => {
     const content = `
 $meta:
   name: 'testMultipleAliases'
@@ -110,14 +114,18 @@ section1:
     const context = createValidationContext(content);
     convertAliasesToReferences(context);
 
-    // Should add errors for both YAML aliases
+    // Should not add errors since aliases are converted
     const errors = (context.session as any)._errors;
-    expect(errors.length).toBe(2);
-    expect(errors[0].code).toBe('LAML_YAML_ALIAS_NOT_ALLOWED');
-    expect(errors[1].code).toBe('LAML_YAML_ALIAS_NOT_ALLOWED');
+    expect(errors.length).toBe(0);
+    
+    // Should add auto-fix messages for both aliases
+    const autoFixMessages = context.autoFixManager.getAll();
+    expect(autoFixMessages.length).toBe(2);
+    expect(autoFixMessages.some(msg => msg.includes('ref1'))).toBe(true);
+    expect(autoFixMessages.some(msg => msg.includes('ref2'))).toBe(true);
   });
 
-  test('should handle alias without matching anchor', () => {
+  test('should convert alias without matching anchor', () => {
     const content = `
 $meta:
   name: 'testOrphanAlias'
@@ -133,11 +141,14 @@ section1:
     const context = createValidationContext(content);
     convertAliasesToReferences(context);
 
-    // Should add error for orphan alias
+    // Should not add errors since alias is converted
     const errors = (context.session as any)._errors;
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].code).toBe('LAML_YAML_ALIAS_NOT_ALLOWED');
-    expect(errors[0].context.alias).toBe('nonexistent');
+    expect(errors.length).toBe(0);
+    
+    // Should add auto-fix message for the alias
+    const autoFixMessages = context.autoFixManager.getAll();
+    expect(autoFixMessages.length).toBeGreaterThan(0);
+    expect(autoFixMessages[0]).toContain('nonexistent');
   });
 
   test('should handle empty document gracefully', () => {
@@ -187,7 +198,7 @@ section:
     expect((context.session as any)._errors.length).toBe(0);
   });
 
-  test('should handle complex YAML with nested aliases', () => {
+  test('should convert complex YAML with nested aliases', () => {
     const content = `
 defaults: &defaults
   timeout: 30
@@ -205,9 +216,13 @@ staging:
     const context = createValidationContext(content);
     convertAliasesToReferences(context);
 
-    // Should detect multiple aliases
+    // Should not add errors since aliases are converted
     const errors = (context.session as any)._errors;
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors.every((e: any) => e.code === 'LAML_YAML_ALIAS_NOT_ALLOWED')).toBe(true);
+    expect(errors.length).toBe(0);
+    
+    // Should add auto-fix messages for detected aliases
+    const autoFixMessages = context.autoFixManager.getAll();
+    expect(autoFixMessages.length).toBeGreaterThan(0);
+    expect(autoFixMessages.every(msg => msg.includes('Converted YAML alias'))).toBe(true);
   });
 }); 

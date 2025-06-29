@@ -10,8 +10,10 @@ export type {
   CircularReference,
   OverlappingDomains,
   AliasInfo,
-  AnchorInfo
 } from './types.js';
+
+// Utilities
+export { AutoFixManager } from './utils/autoFixManager.js';
 
 // Core validators
 export { validateMandatorySections } from './core/validateMandatorySections.js';

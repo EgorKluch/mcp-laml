@@ -33,10 +33,10 @@ export function validateValueTypes(context: ValidationContext): void {
             // Try to auto-fix boolean values
             if (value === 'true' || value === 'yes' || value === '1') {
               pair.value = new yaml.Scalar(true);
-              context.autoFixedIssues.push(`Fixed boolean value for ${key}: ${value} -> true`);
+              context.autoFixManager.add(`Fixed boolean value for ${key}: ${value} -> true`);
             } else if (value === 'false' || value === 'no' || value === '0') {
               pair.value = new yaml.Scalar(false);
-              context.autoFixedIssues.push(`Fixed boolean value for ${key}: ${value} -> false`);
+              context.autoFixManager.add(`Fixed boolean value for ${key}: ${value} -> false`);
             } else {
               session.logger.addError({
                 code: 'LAML_INVALID_BOOLEAN_VALUE',

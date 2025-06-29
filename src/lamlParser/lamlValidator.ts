@@ -10,7 +10,6 @@ export {
   type CircularReference,
   type OverlappingDomains,
   type AliasInfo,
-  type AnchorInfo
 } from './validators/index.js';
 
 // Re-export McpSession for backward compatibility

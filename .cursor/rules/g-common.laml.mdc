@@ -95,3 +95,13 @@ codeChanges:
     description: "Avoid refactoring existing working code to match current patterns unless specifically requested"
     approach: "Focus on new code following patterns rather than updating legacy code"
     exception: "Only update existing code style when user explicitly asks for refactoring or style improvements"
+
+codeOrganization:
+  purpose: "Define standards for organizing code structure and components"
+  
+  utilities:
+    rule: "Each utility should be created in its own folder"
+    description: "Utilities must be organized into separate folders for better maintainability and clarity"
+    structure: "Each utility should have its own dedicated folder containing all related files"
+    rationale: "Improves code organization, makes utilities easier to locate, and enables better dependency management"
+    

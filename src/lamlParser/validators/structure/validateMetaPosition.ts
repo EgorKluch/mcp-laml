@@ -7,7 +7,7 @@ import { ValidationContext } from '../types.js';
  * to ensure strict ordering compliance
  */
 export function validateMetaPosition(context: ValidationContext): void {
-  const { document, session, autoFixedIssues } = context;
+  const { document, session, autoFixManager } = context;
   
   if (!document.contents || !yaml.isMap(document.contents)) {
     return;
@@ -32,7 +32,7 @@ export function validateMetaPosition(context: ValidationContext): void {
       const [metaItem] = rootMap.items.splice(metaIndex, 1);
       rootMap.items.unshift(metaItem);
       
-      autoFixedIssues.push('Moved $meta section to first position');
+      autoFixManager.add('Moved $meta section to first position');
     } else if (metaIndex === -1) {
       // $meta section missing - will be handled by validateMandatorySections
       session.logger.addError({

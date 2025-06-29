@@ -2,6 +2,7 @@ import { validateYamlWrapping } from '../validateYamlWrapping.js';
 import { ValidationContext } from '../../types.js';
 import { McpSession } from 'flowmcp';
 import * as yaml from 'yaml';
+import { AutoFixManager } from '../../utils/autoFixManager.js';
 
 function createMockSession(): McpSession {
   const errors: unknown[] = [];
@@ -18,10 +19,11 @@ function createMockSession(): McpSession {
 }
 
 function createMockContext(filename: string): ValidationContext {
+  const autoFixManager = new AutoFixManager();
   return {
     document: new yaml.Document(),
     session: createMockSession(),
-    autoFixedIssues: [],
+    autoFixManager,
     filename
   };
 }
@@ -46,7 +48,7 @@ $meta:
 section:
   property: 'value'
 \`\`\``);
-    expect(context.autoFixedIssues).toContain('Wrapped content in ```yaml blocks');
+    expect(context.autoFixManager.getAll()).toContain('Wrapped content in ```yaml blocks');
   });
 
   test('should auto-fix unwrapped content in .mdc files', () => {
@@ -68,7 +70,7 @@ $meta:
   name: 'test'
 \`\`\`
 \`\`\``); // Wrapped in yaml blocks
-    expect(context.autoFixedIssues).toContain('Wrapped content in ```yaml blocks');
+    expect(context.autoFixManager.getAll()).toContain('Wrapped content in ```yaml blocks');
   });
 
   test('should preserve cursor frontmatter when auto-fixing', () => {
@@ -99,7 +101,7 @@ $meta:
     const result = validateYamlWrapping(context, content, 'regular.md');
     
     expect(result).toBe(content);
-    expect(context.autoFixedIssues).toHaveLength(0);
+    expect(context.autoFixManager.getAll()).toHaveLength(0);
   });
 
   test('should not change properly wrapped content', () => {
@@ -113,6 +115,6 @@ $meta:
     const result = validateYamlWrapping(context, content, 'test.laml.md');
     
     expect(result).toBe(content);
-    expect(context.autoFixedIssues).toHaveLength(0);
+    expect(context.autoFixManager.getAll()).toHaveLength(0);
   });
 }); 

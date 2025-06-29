@@ -1,5 +1,21 @@
 import * as yaml from 'yaml';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ReferenceInfo, DefinitionInfo, CircularReference } from '../types.js';
+
+/**
+ * Information about external reference files
+ */
+export interface ExternalReferenceInfo {
+  key: string;
+  path: string;
+  description?: string;
+}
+
+/**
+ * Cache for loaded external documents
+ */
+const externalDocumentCache = new Map<string, yaml.Document>();
 
 /**
  * Finds all LAML references in document
@@ -11,20 +27,27 @@ export function findAllReferences(document: yaml.Document): ReferenceInfo[] {
     Scalar(_, node) {
       if (typeof node.value === 'string') {
         // Check for direct LAML references (strings starting with *)
-        if (node.value.startsWith('*')) {
+        // Skip escaped references (starting with \*)
+        if (node.value.startsWith('\\*')) {
+          // Skip escaped asterisks
+        } else if (node.value.startsWith('*')) {
           references.push({
             path: node.value,
             line: node.range?.[0]
           });
         } else {
           // Search for LAML references within multiline strings
-          const matches = node.value.match(/\*[a-zA-Z][a-zA-Z0-9]*(?:\.[a-zA-Z][a-zA-Z0-9]*)*/g);
-          if (matches) {
-            for (const match of matches) {
-              references.push({
-                path: match,
-                line: node.range?.[0]
-              });
+          // Find all potential matches first, then filter out escaped ones
+          const allMatches = node.value.match(/\\?\*[a-zA-Z][a-zA-Z0-9]*(?:\.[a-zA-Z][a-zA-Z0-9]*)*/g);
+          if (allMatches) {
+            for (const match of allMatches) {
+              // Skip escaped references (starting with \*)
+              if (!match.startsWith('\\*')) {
+                references.push({
+                  path: match,
+                  line: node.range?.[0]
+                });
+              }
             }
           }
         }
@@ -74,7 +97,17 @@ export function findAllDefinitions(document: yaml.Document): DefinitionInfo[] {
  */
 export function isValidReference(path: string): boolean {
   if (!path.startsWith('*')) return false;
+  
   const dotPath = path.slice(1);
+  
+  // Check for external reference format: $refs.externalKey.path
+  if (dotPath.startsWith('$refs.')) {
+    const externalPath = dotPath.slice(6); // Remove '$refs.'
+    // Must have at least: externalKey.section
+    return /^[a-zA-Z][a-zA-Z0-9]*\.[a-zA-Z][a-zA-Z0-9]*(\.[a-zA-Z][a-zA-Z0-9]*)*$/.test(externalPath);
+  }
+  
+  // Check for internal reference format: section.property
   return /^[a-zA-Z][a-zA-Z0-9]*(\.[a-zA-Z][a-zA-Z0-9]*)*$/.test(dotPath);
 }
 
@@ -200,4 +233,182 @@ function findPropertyContainingReference(document: yaml.Document, referencePath:
   };
 
   return findInMap(document.contents);
+}
+
+/**
+ * Extracts $refs section from document
+ */
+export function extractRefsSection(document: yaml.Document): ExternalReferenceInfo[] {
+  const refs: ExternalReferenceInfo[] = [];
+  
+  if (!document.contents || !yaml.isMap(document.contents)) {
+    return refs;
+  }
+
+  const refsItem = document.contents.items.find(item => 
+    yaml.isScalar(item.key) && item.key.value === '$refs'
+  );
+
+  if (!refsItem || !yaml.isMap(refsItem.value)) {
+    return refs;
+  }
+
+  const refsMap = refsItem.value;
+  for (const item of refsMap.items) {
+    if (yaml.isScalar(item.key) && typeof item.key.value === 'string') {
+      const key = item.key.value;
+      
+      if (yaml.isMap(item.value)) {
+        const refMap = item.value;
+        const pathItem = refMap.items.find(i => 
+          yaml.isScalar(i.key) && i.key.value === 'path'
+        );
+        const descItem = refMap.items.find(i => 
+          yaml.isScalar(i.key) && i.key.value === 'description'
+        );
+
+        if (pathItem && yaml.isScalar(pathItem.value) && typeof pathItem.value.value === 'string') {
+          refs.push({
+            key,
+            path: pathItem.value.value,
+            description: descItem && yaml.isScalar(descItem.value) && typeof descItem.value.value === 'string' 
+              ? descItem.value.value 
+              : undefined
+          });
+        }
+      }
+    }
+  }
+
+  return refs;
+}
+
+/**
+ * Loads external LAML document from file path
+ */
+export function loadExternalDocument(filePath: string, baseDir?: string): yaml.Document | null {
+  let resolvedPath: string;
+  if (baseDir) {
+    // Apply same baseDir logic as in validateReferences.ts
+    let adjustedBaseDir = baseDir;
+    if (baseDir.endsWith('.cursor/rules') || baseDir.includes('.cursor/rules/')) {
+      // Navigate up to project root (assuming .cursor/rules structure)
+      const cursorIndex = baseDir.lastIndexOf('.cursor');
+      adjustedBaseDir = cursorIndex > 0 ? baseDir.substring(0, cursorIndex) : baseDir;
+    }
+    resolvedPath = path.resolve(adjustedBaseDir, filePath);
+  } else {
+    resolvedPath = path.resolve(filePath);
+  }
+  
+  // Check cache first
+  if (externalDocumentCache.has(resolvedPath)) {
+    return externalDocumentCache.get(resolvedPath)!;
+  }
+
+  try {
+    if (!fs.existsSync(resolvedPath)) {
+      return null;
+    }
+
+    const content = fs.readFileSync(resolvedPath, 'utf-8');
+    
+    // Extract YAML from markdown code blocks if necessary
+    let yamlContent = content;
+    // Try full yaml block first (with closing ```)
+    let yamlBlockMatch = content.match(/```ya?ml\s*\n([\s\S]*?)\n```/);
+    if (yamlBlockMatch) {
+      yamlContent = yamlBlockMatch[1];
+    } else {
+      // Try yaml block without closing ``` (for .mdc files)
+      yamlBlockMatch = content.match(/```ya?ml\s*\n([\s\S]*)/);
+      if (yamlBlockMatch) {
+        yamlContent = yamlBlockMatch[1];
+      }
+    }
+
+    const document = yaml.parseDocument(yamlContent);
+    externalDocumentCache.set(resolvedPath, document);
+    return document;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Checks if reference is an external reference (starts with *$refs.)
+ */
+export function isExternalReference(refPath: string, externalRefs: ExternalReferenceInfo[]): { isExternal: boolean; refKey?: string; localPath?: string } {
+  if (!refPath.startsWith('*$refs.')) {
+    return { isExternal: false };
+  }
+
+  const path = refPath.slice(7);  // Remove '*$refs.'
+  const segments = path.split('.');
+  
+  if (segments.length < 2) {
+    return { isExternal: false };
+  }
+  
+  const refKey = segments[0];
+  const localPath = segments.slice(1).join('.');
+  
+  // Check if the external key exists in $refs
+  const hasKey = externalRefs.some(ref => ref.key === refKey);
+  
+  if (hasKey) {
+    return { 
+      isExternal: true, 
+      refKey, 
+      localPath 
+    };
+  }
+
+  return { isExternal: false };
+}
+
+/**
+ * Validates external reference
+ */
+export function validateExternalReference(
+  refPath: string, 
+  externalRefs: ExternalReferenceInfo[], 
+  baseDir?: string
+): { isValid: boolean; error?: string } {
+  const { isExternal, refKey, localPath } = isExternalReference(refPath, externalRefs);
+  
+  if (!isExternal || !refKey || !localPath) {
+    return { isValid: false, error: 'Not a valid external reference' };
+  }
+
+  const externalRef = externalRefs.find(ref => ref.key === refKey);
+  if (!externalRef) {
+    return { isValid: false, error: `External reference key '${refKey}' not found in $refs section` };
+  }
+
+  const externalDoc = loadExternalDocument(externalRef.path, baseDir);
+  if (!externalDoc) {
+    return { isValid: false, error: `Cannot load external file: ${externalRef.path}` };
+  }
+
+  const localRefPath = '*' + localPath;
+  if (!referenceExists(externalDoc, localRefPath)) {
+    return { isValid: false, error: `Reference '${localPath}' not found in external file ${externalRef.path}` };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Unescapes asterisk characters in value (converts \* to *)
+ */
+export function unescapeAsterisks(value: string): string {
+  return value.replace(/\\\*/g, '*');
+}
+
+/**
+ * Checks if value contains escaped asterisks
+ */
+export function hasEscapedAsterisks(value: string): boolean {
+  return value.includes('\\*');
 } 

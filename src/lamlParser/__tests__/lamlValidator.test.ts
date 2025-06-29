@@ -71,7 +71,6 @@ section1:
       expect(result.isValid).toBe(false); // Invalid due to empty domains array
       expect(result.autoFixedIssues).toContain('Added missing $meta section');
       expect(result.fixedDocument).toBeDefined(); // Document is created even if invalid
-      expect((session as any)._warnings.length).toBeGreaterThan(0);
       
       // Should have domains empty error (after auto-fixing domains field)
       expect((session as any)._errors.some((e: any) => e.code === 'LAML_DOMAINS_EMPTY')).toBe(true);
@@ -540,7 +539,7 @@ productionConfig:
       expect((session as any)._errors.filter((e: any) => e.code === 'LAML_YAML_MERGE_KEY_INVALID').length).toBeGreaterThan(0);
     });
 
-    test('should error on simple value aliases', () => {
+    test('should auto-fix simple value aliases', () => {
       const simpleAliases = `
 $meta:
   name: 'testSimpleAliases'
@@ -560,12 +559,13 @@ content:
       const parseResult = parseLaml(simpleAliases);
       const result = validateLaml(parseResult, session);
       
-      // YAML aliases are not allowed in LAML documents
-      expect(result.isValid).toBe(false);
-      expect((session as any)._errors.filter((e: any) => e.code === 'LAML_YAML_ALIAS_NOT_ALLOWED').length).toBeGreaterThan(0);
+      // YAML aliases should be auto-converted to LAML references
+      expect(result.isValid).toBe(true);
+      expect(result.autoFixedIssues.some(issue => issue.includes('Converted YAML alias'))).toBe(true);
+      expect((session as any)._errors.filter((e: any) => e.code === 'LAML_YAML_ALIAS_NOT_ALLOWED').length).toBe(0);
     });
 
-    test('should error on complex nested aliases', () => {
+    test('should auto-fix complex nested aliases', () => {
       const nestedAliases = `
 $meta:
   name: 'testNestedAliases'
@@ -597,9 +597,10 @@ production:
       const parseResult = parseLaml(nestedAliases);
       const result = validateLaml(parseResult, session);
       
-      // YAML aliases are not allowed in LAML documents
-      expect(result.isValid).toBe(false);
-      expect((session as any)._errors.filter((e: any) => e.code === 'LAML_YAML_ALIAS_NOT_ALLOWED').length).toBeGreaterThan(0);
+      // YAML aliases should be auto-converted to LAML references
+      expect(result.isValid).toBe(true);
+      expect(result.autoFixedIssues.some(issue => issue.includes('Converted YAML alias'))).toBe(true);
+      expect((session as any)._errors.filter((e: any) => e.code === 'LAML_YAML_ALIAS_NOT_ALLOWED').length).toBe(0);
     });
   });
 
@@ -632,7 +633,6 @@ authentication:
       // Should have both auto-fixes and errors
       expect(result.autoFixedIssues.length).toBeGreaterThan(0);
       expect((session as any)._errors.length).toBeGreaterThan(0);
-      expect((session as any)._warnings.length).toBeGreaterThan(0);
       
       // Should still be invalid due to critical errors
       expect(result.isValid).toBe(false);

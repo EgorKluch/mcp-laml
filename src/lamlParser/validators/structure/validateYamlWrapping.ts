@@ -26,7 +26,7 @@ export function validateYamlWrapping(
     if (isMdFile || isMdcFile) {
       // Auto-fix for both .md and .mdc files
       const wrappedContent = wrapInYamlBlocks(originalContent, filename);
-      context.autoFixedIssues.push('Wrapped content in ```yaml blocks');
+      context.autoFixManager.add('Wrapped content in ```yaml blocks');
       return wrappedContent;
     }
   }

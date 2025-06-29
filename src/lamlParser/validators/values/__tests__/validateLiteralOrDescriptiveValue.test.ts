@@ -1,6 +1,7 @@
 import * as yaml from 'yaml';
 import { validateLiteralOrDescriptiveValue } from '../validateLiteralOrDescriptiveValue.js';
 import { ValidationContext } from '../../types.js';
+import { AutoFixManager } from '../../utils/autoFixManager.js';
 
 // Mock session for testing
 function createMockSession() {
@@ -22,11 +23,12 @@ function createMockSession() {
 function createValidationContext(): ValidationContext {
   const document = yaml.parseDocument('test: value');
   const session = createMockSession();
+  const autoFixManager = new AutoFixManager();
   
   return {
     document,
     session,
-    autoFixedIssues: [],
+    autoFixManager,
   };
 }
 
@@ -93,7 +95,7 @@ describe('validateLiteralOrDescriptiveValue', () => {
       validateValue(context, 'invalid literal', 'single');
 
       // Value with spaces is treated as descriptive, so gets auto-fixed to double quotes
-      expect(context.autoFixedIssues.some(issue => issue.includes('double quotes'))).toBe(true);
+      expect(context.autoFixManager.getAll().some(issue => issue.includes('double quotes'))).toBe(true);
       expect((context.session as any)._warnings.length).toBe(0);
     });
 

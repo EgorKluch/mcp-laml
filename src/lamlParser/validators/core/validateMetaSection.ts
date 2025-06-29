@@ -63,7 +63,7 @@ export function validateMetaSection(context: ValidationContext, metaItem: yaml.P
       
       try {
         metaMap.add(new yaml.Pair(new yaml.Scalar(field), defaultValue));
-        context.autoFixedIssues.push(`Added missing required field: ${field}`);
+        context.autoFixManager.add(`Added missing required field: ${field}`);
       } catch (error) {
         // Field might already exist due to auto-fix in validateMandatorySections
         // Silently skip if already exists

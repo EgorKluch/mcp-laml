@@ -9,7 +9,7 @@ const MAX_INLINE_LENGTH = 50;
  * - Long structures (>= 50 chars) are converted to block format
  */
 export function formatDataStructures(context: ValidationContext): void {
-  const { document, autoFixedIssues } = context;
+  const { document, autoFixManager } = context;
   
   if (!document.contents) return;
   
@@ -24,7 +24,7 @@ export function formatDataStructures(context: ValidationContext): void {
         if (shouldBeInline !== isCurrentlyInline) {
           // Update the flow property to change format
           node.flow = shouldBeInline;
-          autoFixedIssues.push(`Reformatted object structure for optimal readability`);
+          autoFixManager.add(`Reformatted object structure for optimal readability`);
         }
       }
     },
@@ -38,7 +38,7 @@ export function formatDataStructures(context: ValidationContext): void {
         if (shouldBeInline !== isCurrentlyInline) {
           // Update the flow property to change format
           node.flow = shouldBeInline;
-          autoFixedIssues.push(`Reformatted array structure for optimal readability`);
+          autoFixManager.add(`Reformatted array structure for optimal readability`);
         }
       }
     }

@@ -30,7 +30,7 @@ export function validateMandatorySections(context: ValidationContext): void {
     const metaPair = new yaml.Pair(new yaml.Scalar('$meta'), metaMap);
     rootMap.items.unshift(metaPair);
     
-    context.autoFixedIssues.push('Added missing $meta section');
+    context.autoFixManager.add('Added missing $meta section');
     
     // Get the actual metaPair from the document after it's been added
     const actualMetaItem = rootMap.items.find(item => 
@@ -58,7 +58,7 @@ export function validateMandatorySections(context: ValidationContext): void {
       const [metaItem] = rootMap.items.splice(metaIndex, 1);
       rootMap.items.unshift(metaItem);
       
-      context.autoFixedIssues.push('Moved $meta section to first position');
+      context.autoFixManager.add('Moved $meta section to first position');
     }
   }
 } 

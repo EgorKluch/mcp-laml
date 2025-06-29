@@ -2,6 +2,7 @@ import * as yaml from 'yaml';
 import { formatDataStructures } from '../formatDataStructures.js';
 import { ValidationContext } from '../../types.js';
 import { McpSession } from 'flowmcp';
+import { AutoFixManager } from '../../utils/autoFixManager.js';
 
 // Mock McpSession
 const mockSession = {} as McpSession;
@@ -9,10 +10,11 @@ const mockSession = {} as McpSession;
 describe('formatDataStructures', () => {
   function createValidationContext(yamlContent: string): ValidationContext {
     const document = yaml.parseDocument(yamlContent);
+    const autoFixManager = new AutoFixManager();
     return {
       document,
       session: mockSession,
-      autoFixedIssues: []
+      autoFixManager,
     };
   }
 
@@ -31,8 +33,8 @@ config:
       
       // Should convert to inline format since it's short
       // { timeout: 30, host: 'api.com' } is about 35 characters
-      expect(context.autoFixedIssues.length).toBeGreaterThan(0);
-      expect(context.autoFixedIssues[0]).toContain('Reformatted object structure');
+      expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
+      expect(context.autoFixManager.getAll()[0]).toContain('Reformatted object structure');
       
       // Check that the result contains inline format
       expect(result).toMatch(/config:\s*\{\s*timeout:\s*30,\s*host:\s*['"]api\.com['"]\s*\}/);
@@ -49,8 +51,8 @@ config: { timeout: 30, retries: 3, host: 'api.example.com', port: 8080, secure: 
       const result = context.document.toString();
       
       // Should convert to block format since it's long (> 50 chars)
-      expect(context.autoFixedIssues.length).toBeGreaterThan(0);
-      expect(context.autoFixedIssues[0]).toContain('Reformatted object structure');
+      expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
+      expect(context.autoFixManager.getAll()[0]).toContain('Reformatted object structure');
       
       // Check that the result contains block format (multi-line)
       expect(result).toMatch(/config:\s*\n\s+timeout:\s*30/);
@@ -73,7 +75,7 @@ settings:
       formatDataStructures(context);
       
       // Should not change anything as both are appropriately formatted
-      expect(context.autoFixedIssues.length).toBe(0);
+      expect(context.autoFixManager.getAll().length).toBe(0);
     });
   });
 
@@ -93,7 +95,7 @@ items:
       
       // Should convert to inline format since it's short
       // ['one', 'two', 'three'] is about 25 characters
-      expect(context.autoFixedIssues.some(issue => issue.includes('array structure'))).toBe(true);
+      expect(context.autoFixManager.getAll().some(issue => issue.includes('array structure'))).toBe(true);
       
       // Check that the result contains inline format
       expect(result).toMatch(/items:\s*\[\s*['"]one['"],\s*['"]two['"],\s*['"]three['"]\s*\]/);
@@ -110,8 +112,8 @@ items: ['item1', 'item2', 'item3', 'item4', 'item5', 'item6', 'item7', 'item8']
       const result = context.document.toString();
       
       // Should convert to block format since it's long
-      expect(context.autoFixedIssues.length).toBeGreaterThan(0);
-      expect(context.autoFixedIssues[0]).toContain('Reformatted array structure');
+      expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
+      expect(context.autoFixManager.getAll()[0]).toContain('Reformatted array structure');
     });
 
     it('should convert array of objects according to user example', () => {
@@ -129,8 +131,8 @@ items:
       const result = context.document.toString();
       
       // Should format nested objects and potentially the array
-      expect(context.autoFixedIssues.length).toBeGreaterThan(0);
-      expect(context.autoFixedIssues.some(issue => issue.includes('structure'))).toBe(true);
+      expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
+      expect(context.autoFixManager.getAll().some(issue => issue.includes('structure'))).toBe(true);
       
       // The array might convert to inline format: [{ k: 'one', v: 1 }, { k: 'two', v: 2 }]
       // Or individual objects might convert to inline within the block array
@@ -159,8 +161,8 @@ complexItems:
       const result = context.document.toString();
       
       // Should format multiple levels: main array, nested objects, and nested arrays
-      expect(context.autoFixedIssues.length).toBeGreaterThan(0);
-      expect(context.autoFixedIssues.some(issue => issue.includes('structure'))).toBe(true);
+      expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
+      expect(context.autoFixManager.getAll().some(issue => issue.includes('structure'))).toBe(true);
       
       // Check that formatting occurred at multiple levels
       // The inner arrays [1] and [2] should be inline since they're very short
@@ -168,7 +170,7 @@ complexItems:
       const hasInlineFormat = result.includes('[ { k: { v: [ 1 ] } }') || result.includes('[{k:{v:[1]}}');
       
       // At least some formatting at nested levels should occur
-      expect(context.autoFixedIssues.length).toBeGreaterThanOrEqual(2);
+      expect(context.autoFixManager.getAll().length).toBeGreaterThanOrEqual(2);
     });
 
     it('should handle large deeply nested structures that stay in block format', () => {
@@ -192,7 +194,7 @@ largeComplexItems:
       
       // Should recognize that some structures are too large for inline format
       // and keep them in block format while still formatting smaller nested parts
-      expect(context.autoFixedIssues.length).toBeGreaterThanOrEqual(0); // May or may not format parts
+      expect(context.autoFixManager.getAll().length).toBeGreaterThanOrEqual(0); // May or may not format parts
       
       // Check that large structures remain in block format (multi-line)
       const hasBlockFormat = result.includes('\n') && result.includes('  ');
@@ -221,7 +223,7 @@ complex:
       const result = context.document.toString();
       
       // Should convert both nested structures to inline format
-      expect(context.autoFixedIssues.length).toBeGreaterThan(0);
+      expect(context.autoFixManager.getAll().length).toBeGreaterThan(0);
     });
   });
 
@@ -239,7 +241,7 @@ blockEmpty:
       const result = context.document.toString();
       
       // Should not crash and should not change empty structures
-      expect(context.autoFixedIssues.length).toBe(0);
+      expect(context.autoFixManager.getAll().length).toBe(0);
     });
 
     it('should handle mixed data types', () => {

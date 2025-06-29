@@ -2,6 +2,7 @@ import { validateMetaPosition } from '../validateMetaPosition.js';
 import { ValidationContext } from '../../types.js';
 import { McpSession } from 'flowmcp';
 import * as yaml from 'yaml';
+import { AutoFixManager } from '../../utils/autoFixManager.js';
 
 function createMockSession(): McpSession {
   const errors: unknown[] = [];
@@ -19,10 +20,11 @@ function createMockSession(): McpSession {
 
 function createMockContext(yamlContent: string): ValidationContext {
   const document = yaml.parseDocument(yamlContent);
+  const autoFixManager = new AutoFixManager();
   return {
     document,
     session: createMockSession(),
-    autoFixedIssues: []
+    autoFixManager,
   };
 }
 
@@ -40,7 +42,7 @@ section:
     const context = createMockContext(yamlContent);
     validateMetaPosition(context);
     
-    expect(context.autoFixedIssues).toHaveLength(0);
+    expect(context.autoFixManager.getAll()).toHaveLength(0);
     expect((context.session as any)._errors).toHaveLength(0);
   });
 
@@ -57,7 +59,7 @@ $meta:
     const context = createMockContext(yamlContent);
     validateMetaPosition(context);
     
-    expect(context.autoFixedIssues).toContain('Moved $meta section to first position');
+    expect(context.autoFixManager.getAll()).toContain('Moved $meta section to first position');
     
     // Check that $meta is now first
     const rootMap = context.document.contents as yaml.YAMLMap;
@@ -88,7 +90,7 @@ another:
     validateMetaPosition(context);
     
     // Should not crash or add errors for empty document
-    expect(context.autoFixedIssues).toHaveLength(0);
+    expect(context.autoFixManager.getAll()).toHaveLength(0);
   });
 
   test('should handle non-map root gracefully', () => {
@@ -101,6 +103,6 @@ another:
     validateMetaPosition(context);
     
     // Should not crash for non-map root
-    expect(context.autoFixedIssues).toHaveLength(0);
+    expect(context.autoFixManager.getAll()).toHaveLength(0);
   });
 }); 

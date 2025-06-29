@@ -1,5 +1,6 @@
 import * as yaml from 'yaml';
 import { McpSession } from 'flowmcp';
+import { AutoFixManager } from './utils/autoFixManager.js';
 
 export interface LamlValidationResult {
   isValid: boolean;
@@ -12,7 +13,7 @@ export interface LamlValidationResult {
 export interface ValidationContext {
   document: yaml.Document;
   session: McpSession;
-  autoFixedIssues: string[];
+  autoFixManager: AutoFixManager;
   originalContent?: string;
   filename?: string;
 }
